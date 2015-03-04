@@ -178,7 +178,7 @@ class SQLAVisitor(ast.NodeVisitor):
         """
 
         self.visit(node.left)
-        left = getattr(self.model, self.current_value)
+        left = self.current_value
 
         operation = self.op_mapper[node.ops[0].__class__]
 
@@ -188,10 +188,23 @@ class SQLAVisitor(ast.NodeVisitor):
 
         value = self.current_value
 
-        if self.ops:
-            self.ops[-1]['args'].append(operation(left, value))
+        if '.' in left:
+            if operation != sqla_op.eq:
+                raise ParseError("Only equality comparison is supported "
+                                 "for statements with relationship resolution")
+
+            # Relation has to be resolved
+            parts = left.split('.')
+            relation = getattr(self.model, parts[0])
+            condition = relation.has(**{'.'.join(parts[1:]): value})
         else:
-            self.sqla_query.append(operation(left, value))
+            attr = getattr(self.model, left)
+            condition = operation(attr, value)
+
+        if self.ops:
+            self.ops[-1]['args'].append(condition)
+        else:
+            self.sqla_query.append(condition)
 
     def visit_BoolOp(self, node):
         """ Boolean operator handler.
