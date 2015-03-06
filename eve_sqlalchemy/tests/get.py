@@ -535,6 +535,77 @@ class TestGetSQL(TestBaseSQL):
 
         _db.session.rollback()
 
+    def test_get_where_relationship_one_to_many(self):
+        _db = self.app.data.driver
+
+        # create random person
+        fake_person = self.test_sql_tables.People.\
+            from_tuple(self.random_people(1)[0])
+        fake_person._created = datetime.now()
+        fake_person._updated = datetime.now()
+        _db.session.add(fake_person)
+        _db.session.flush()
+        fake_person2 = self.test_sql_tables.People.\
+            from_tuple(self.random_people(1)[0])
+        fake_person2._created = datetime.now()
+        fake_person2._updated = datetime.now()
+        _db.session.add(fake_person2)
+        _db.session.flush()
+        fake_invoice = self.test_sql_tables.Invoices(number=4)
+        fake_invoice.people_id = fake_person._id
+        fake_invoice._created = datetime.now()
+        fake_invoice._updated = datetime.now()
+        _db.session.add(fake_invoice)
+        _db.session.flush()
+        fake_invoice2 = self.test_sql_tables.Invoices(number=5)
+        fake_invoice2.people_id = fake_person._id
+        fake_invoice2._created = datetime.now()
+        fake_invoice2._updated = datetime.now()
+        _db.session.add(fake_invoice2)
+        _db.session.flush()
+
+        response, status = self.get('users?where=invoices.number==4')
+        self.assert200(status)
+        # 1 user
+        self.assertEqual(len(response['_items']), 1)
+        # Has a relationship which satisfies the requirement
+        self.assertEqual(fake_invoice.people_id, response['_items'][0]['_id'])
+
+    def test_get_where_relationship_many_to_one(self):
+        _db = self.app.data.driver
+
+        # create random person
+        fake_person = self.test_sql_tables.People.\
+            from_tuple(("Jack", "Jones", 10))
+        fake_person._created = datetime.now()
+        fake_person._updated = datetime.now()
+        _db.session.add(fake_person)
+        fake_person2 = self.test_sql_tables.People.\
+            from_tuple(("Rupert", "Jones", 10))
+        fake_person2._created = datetime.now()
+        fake_person2._updated = datetime.now()
+        _db.session.flush()
+        fake_invoice = self.test_sql_tables.Invoices(number=4)
+        fake_invoice.people_id = fake_person._id
+        fake_invoice._created = datetime.now()
+        fake_invoice._updated = datetime.now()
+        _db.session.add(fake_invoice)
+        fake_invoice2 = self.test_sql_tables.Invoices(number=5)
+        fake_invoice2.people_id = fake_person2._id
+        fake_invoice2._created = datetime.now()
+        fake_invoice2._updated = datetime.now()
+        _db.session.add(fake_invoice2)
+        _db.session.flush()
+
+        response, status = self.get('invoices?where=people.firstname=="Jack"')
+        self.assert200(status)
+        # 1 invoice
+        print response['_items']
+        self.assertEqual(len(response['_items']), 1)
+        # Has relationship to Jack
+        self.assertEqual(response['_items'][0]['people_id'], fake_person._id)
+
+
 
 class TestGetItem(TestBaseSQL):
 
