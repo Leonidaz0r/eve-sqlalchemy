@@ -16,6 +16,7 @@ import json
 from eve.utils import str_to_date
 from sqlalchemy.ext.associationproxy import AssociationProxy
 from sqlalchemy.sql import expression as sqla_exp
+from sqlalchemy.exc import InvalidRequestError
 
 
 class ParseError(ValueError):
@@ -196,7 +197,14 @@ class SQLAVisitor(ast.NodeVisitor):
             # Relation has to be resolved
             parts = left.split('.')
             relation = getattr(self.model, parts[0])
-            condition = relation.has(**{'.'.join(parts[1:]): value})
+            try:
+                # This will work for many-to-one relationships
+                condition = relation.has(**{'.'.join(parts[1:]): value})
+            except InvalidRequestError:
+                # This will work for one-to-many relationships
+                # In this case we accept if there is any related object which
+                # satisfies the requirement
+                condition = relation.any(**{'.'.join(parts[1:]): value})
         else:
             attr = getattr(self.model, left)
             condition = operation(attr, value)
